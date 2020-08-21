@@ -1,0 +1,56 @@
+- name: Web config 1 | Apache disable defaults sites
+  shell: "{{ item }}"
+  loop:
+    - a2dissite 000-default
+    - a2dissite default-ssl
+
+- name: Web config 1 | Apache mods activation
+  apache2_module:
+    state: present
+    name: "{{ item }}"
+  loop:
+    - ssl
+    - headers
+    - rewrite
+    - proxy
+    - proxy_wstunnel
+    - proxy_wstunnel
+    - proxy_http
+    - proxy_balancer
+
+- name: Web config 1 | Get latest version on GitHub
+  github_release:
+    user: turtle0x1
+    repo: LxdMosaic
+    action: latest_release
+  register: tag
+
+- debug:
+    msg:
+    - "The latest version of  {{ app_name | upper }} is {{ tag.tag }}"
+
+- name: Web config 1 | Git clone"
+  git:
+    repo: 'https://github.com/turtle0x1/LxdMosaic.git'
+    dest: /var/www/LxdMosaic
+    version: "{{ tag.tag }}"
+
+- name: Web config 1 | Create sensitivedata subdirectory
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0775'
+    owner: "www-data"
+    group: "www-data"
+  loop:
+    - "/var/www/LxdMosaic/src/sensitiveData/certs"
+    - "/var/www/LxdMosaic/src/sensitiveData/backups"
+
+- name: Web config 1 | Install by NPM
+  npm:
+    path: "/var/www/LxdMosaic"
+
+- name: Web config 1 | Install by Composer
+  composer:
+    command: install
+    working_dir: /var/www/LxdMosaic

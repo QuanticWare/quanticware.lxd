@@ -1,0 +1,12 @@
+- name: Creation group "{{ role_user }}"
+  group:
+    name: "{{ role_user }}"
+    state: present
+
+- name: Creation utilisateur
+  user:
+    name: "{{ role_user }}"
+    comment: lxdmosaic user
+    system: yes
+    group: "{{ role_user }}"
+    append: yes

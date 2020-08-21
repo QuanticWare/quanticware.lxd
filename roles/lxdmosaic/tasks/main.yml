@@ -1,0 +1,17 @@
+---
+# tasks file for quanticware.lxdmosaic
+
+- name: "{{ app_name | upper }}  | Role's user configuration"
+  include: user.yml
+
+- name: "{{ app_name | upper }}  | Dependencies configuration"
+  include: dependencies.yml
+
+- name: "{{ app_name | upper }}  | Web configuration part 1"
+  include: web1.yml
+
+- name: "{{ app_name | upper }}  | MySQL configuration"
+  include: mysql.yml
+
+- name: "{{ app_name | upper }}  | Web configuration part 2"
+  include: web2.yml

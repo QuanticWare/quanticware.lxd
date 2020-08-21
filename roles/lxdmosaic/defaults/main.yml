@@ -1,0 +1,19 @@
+---
+# defaults file for quanticware.lxdmosaic
+
+app_name: lxdmosaic
+role_user: lxdmosaic
+
+docker_method: false
+docker_compose_version: "3.8"
+
+mysql_lxdmosaic_user: lxd
+mysql_lxdmosaic_user_passwd: password
+root_user: root
+db_root_pass: password
+
+mysql_local: true
+
+# fill mysql_lxd_hostname var if mysql is not on localhost
+mysql_lxd_hostname: mariadb
+mariadb_version: 10.5

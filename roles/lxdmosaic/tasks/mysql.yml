@@ -1,0 +1,160 @@
+- name: MySQL | Copy .env for configuration
+  copy:
+    src: "/var/www/LxdMosaic/.env.dist"
+    dest: "/var/www/LxdMosaic/.env"
+    remote_src: yes
+
+- name: MySQL | Credentials changes for MySQL remote access
+  replace:
+    path: "/var/www/LxdMosaic/.env"
+    regexp: "{{ item.regexp }}"
+    replace: "{{ item.replace }}"
+  loop:
+    - { regexp: "DB_HOST=.*" , replace: "DB_HOST={{ mysql_lxd_hostname }}" }
+    - { regexp: "DB_USER=.*" , replace: "DB_USER={{ mysql_lxdmosaic_user }}" }
+    - { regexp: "DB_PASS=.*" , replace: "DB_PASS={{ mysql_lxdmosaic_user_passwd }}" }
+  when: mysql_local == False
+
+- name: MySQL | Credentials changes for MySQL local access
+  replace:
+    path: "/var/www/LxdMosaic/.env"
+    regexp: "{{ item.regexp }}"
+    replace: "{{ item.replace }}"
+  loop:
+    - { regexp: "DB_HOST=.*" , replace: "DB_HOST=localhost" }
+    - { regexp: "DB_USER=.*" , replace: "DB_USER={{ mysql_lxdmosaic_user }}" }
+    - { regexp: "DB_PASS=.*" , replace: "DB_PASS={{ mysql_lxdmosaic_user_passwd }}" }
+  when: mysql_local == True
+
+- name: MySQL | MariaDB local installation
+  block:
+    - name: "MariaDB | packages needed"
+      apt:
+        pkg: "{{ item }}"
+        force_apt_get: yes
+        state: present
+        update_cache: yes
+      loop:
+        - software-properties-common
+        - python3-mysqldb
+        - python3-apt
+        - python3-pymysql
+        - python3-pip
+
+    - name: "MariaDB | repository key for version {{ mariadb_version }}"
+      apt_key:
+        keyserver: "hkp://keyserver.ubuntu.com:80"
+        id: "0xF1656F24C74CD1D8"
+
+    - name: MariaDB | add repository
+      apt_repository:
+        repo: "deb [arch=amd64,arm64,ppc64el] http://mirrors.up.pt/pub/mariadb/repo/{{ mariadb_version }}/ubuntu {{ ansible_distribution_release }} main"
+        state: present
+
+    - name: MariaDB | Installation
+      apt:
+        pkg: "mariadb-server"
+        force_apt_get: yes
+        state: present
+
+    - name: MariaDB | Set MariaDB root password for 127.0.0.1, ::1
+      mysql_user:
+        login_user: "{{ root_user }}"
+        login_password: "{{ db_root_pass }}"
+        user: "{{ root_user }}"
+        password: "{{ db_root_pass }}"
+        host: "{{ item }}"
+        priv: '*.*:ALL,GRANT'
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      loop:
+        - ::1
+        - 127.0.0.1
+        - localhost
+
+    - name: MySQL | LXD_Manager database creation
+      mysql_db:
+        login_user: "{{ root_user }}"
+        login_password: "{{ db_root_pass }}"
+        name: LXD_Manager
+        encoding: utf8
+        state: present
+
+    - name: MySQL | lxd user creation with privileges
+      mysql_user:
+        login_user: "{{ root_user }}"
+        login_password: "{{ db_root_pass }}"
+        name: "{{ mysql_lxdmosaic_user }}"
+        password: "{{ mysql_lxdmosaic_user_passwd }}"
+        host: "%"
+        priv: 'LXD_Manager.*:ALL'
+        state: present
+        append_privs: yes
+
+    - name: MySQL | SQL dump import
+      mysql_db:
+        login_user: "{{ mysql_lxdmosaic_user }}"
+        login_password: "{{ mysql_lxdmosaic_user_passwd }}"
+        name: LXD_Manager
+        state: import
+        target: "/var/www/LxdMosaic/sql/{{ item }}"
+      loop: "{{ sql_list }}"
+  when: mysql_local == True
+
+- name: "MySQL | SQL dumps transfer on {{ mysql_lxd_hostname }}"
+  block:
+    - name: MySQL | SQL dumps compress"
+      archive:
+        path: /var/www/LxdMosaic/sql/
+        dest: /tmp/dumpsql.tgz
+
+    - name: MySQL | Fetch sql dumps
+      fetch:
+        src: "/tmp/dumpsql.tgz"
+        dest: "/tmp/dumpsql.tgz"
+        flat: yes
+
+    - name: MySQL | dump destination directory creation
+      file:
+        path: "/tmp/sql/"
+        state: directory
+        mode: '0750'
+      delegate_to: "{{ mysql_lxd_hostname }}"
+
+    - name: "MySQL | unarchive dump on {{ mysql_lxd_hostname }}"
+      unarchive:
+        src: "/tmp/dumpsql.tgz"
+        dest: "/tmp/sql/"
+      delegate_to: "{{ mysql_lxd_hostname }}"
+  when: mysql_local == False
+
+- name: MySQL | database and import on remote MariaDB
+  block:
+    - name: MySQL | LXD_Manager database creation"
+      mysql_db:
+        login_user: "{{ root_user }}"
+        login_password: "{{ db_root_pass }}"
+        name: LXD_Manager
+        encoding: utf8
+        state: present
+
+    - name: MySQL | lxd user creation with privileges
+      mysql_user:
+        login_user: "{{ root_user }}"
+        login_password: "{{ db_root_pass }}"
+        name: "{{ mysql_lxdmosaic_user }}"
+        password: "{{ mysql_lxdmosaic_user_passwd }}"
+        host: "%"
+        priv: 'LXD_Manager.*:ALL'
+        state: present
+        append_privs: yes
+
+    - name: MySQL | SQL dump import
+      mysql_db:
+        login_user: "{{ mysql_lxdmosaic_user }}"
+        login_password: "{{ mysql_lxdmosaic_user_passwd }}"
+        name: LXD_Manager
+        state: import
+        target: "/tmp/sql/{{ item }}"
+      loop: "{{ sql_list }}"
+  delegate_to: "{{ mysql_lxd_hostname }}"
+  when: mysql_local == False

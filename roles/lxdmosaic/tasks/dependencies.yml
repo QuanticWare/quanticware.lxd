@@ -1,0 +1,43 @@
+- name: Dependencies | deb packages needed
+  apt:
+    pkg: "{{ item }}"
+    force_apt_get: yes
+    state: present
+    update_cache: yes
+  loop:
+    - python3-pip
+    - git
+    - apache2
+    - php
+    - php-cli
+    - php-json
+    - php-mysql
+    - php-xml
+    - php-curl
+    - unzip
+    - zip
+    - git
+    - nodejs
+    - openssl
+    - npm
+    - cron
+
+- name: Dependencies | pip packages needed for GitHub
+  pip:
+    name: "github3.py"
+
+- name: Dependencies | pm2 install
+  npm:
+    name: pm2
+    global: yes
+
+- name: Dependencies | Composer download
+  get_url:
+    url: https://getcomposer.org/installer
+    dest: "/tmp/composer-setup.php"
+    mode: "0750"
+
+- name: Dependencies | Composer installation by php
+  shell: "php composer-setup.php --install-dir=/usr/local/bin --filename=composer"
+  args:
+    chdir: "/tmp/"

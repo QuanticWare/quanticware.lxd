@@ -1,0 +1,7 @@
+---
+# handlers file for quanticware.lxdmosaic
+
+- name: apache2_restart
+  systemd:
+    name: apache2
+    state: restarted

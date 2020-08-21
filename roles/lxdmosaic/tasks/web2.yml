@@ -1,0 +1,26 @@
+- name: Web Config 2 | Copy Apache LXDMosaic file
+  copy:
+    src: "/var/www/LxdMosaic/examples/lxd_manager.conf"
+    dest: "/etc/apache2/sites-available/lxd_manager.conf"
+    remote_src: yes
+
+- name: Web Config 2 | Start by PM2
+  shell: "{{ item }}"
+  args:
+    chdir: "/var/www/LxdMosaic/"
+  loop:
+    - "pm2 start -f node/events.js"
+    - "pm2 startup"
+    - "pm2 save"
+
+- name: Web Config 2 | CRON add
+  cron:
+    name: "gathering data"
+    user: www-data
+    job: "cd /var/www/LxdMosaic/ && vendor/bin/crunz schedule:run"
+
+- name: Web Config 2 | Apache LXDMosaic activation
+  shell: "{{ item }}"
+  loop:
+    - a2ensite lxd_manager
+  notify: apache2_restart
